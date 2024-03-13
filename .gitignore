@@ -1,0 +1,15 @@
+# OS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+
+# Dependencies
+.venv/
+node_modules/
+
+# Local terraform directories
+**/.terraform/*
+# Local state terraform files
+*.tfstate*

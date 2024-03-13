@@ -1,0 +1,41 @@
+version: 3
+
+silent: true
+
+includes:
+  terraform:
+    internal: true
+    taskfile: ./terraform
+
+  tflint:
+    internal: true
+    taskfile: ./tflint
+
+  terragrunt:
+    internal: true
+    taskfile: ./terragrunt
+
+tasks:
+  init:
+    desc: Initialize shims
+    cmds:
+      - echo 'Initializing terraform...'
+      - task: terraform:init
+
+      - echo 'Initializing tflint...'
+      - task: tflint:init
+
+      - echo 'Initializing terragrunt...'
+      - task: terragrunt:init
+
+  clean:
+    desc: Clean shims
+    cmds:
+      - echo 'Cleaning terraform...'
+      - task: terraform:clean
+
+      - echo 'Cleaning tflint...'
+      - task: tflint:clean
+
+      - echo 'Cleaning terragrunt...'
+      - task: terragrunt:clean
