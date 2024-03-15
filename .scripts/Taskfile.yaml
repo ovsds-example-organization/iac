@@ -1,0 +1,51 @@
+version: 3
+
+vars:
+  PENV: .venv
+
+silent: true
+
+includes:
+  shims:
+    internal: true
+    taskfile: ./shims
+
+tasks:
+  init:
+    desc: Initialize environment
+    cmds:
+      - echo 'Installing python dependencies...'
+      - poetry install --no-root
+
+      - echo 'Installing shim dependencies...'
+      - task: shims:init
+
+  lint:
+    desc: Lint
+    cmds:
+      - echo 'Running poetry checks...'
+      - poetry lock --check --no-update
+      - poetry check
+
+  lint-fix:
+    desc: Lint fix
+    cmds:
+      - echo 'Running poetry autofixes...'
+      - poetry lock --no-update
+      - poetry check
+
+  clean:
+    desc: Clean environment
+    cmds:
+      - echo 'Cleaning python dependencies...'
+      - rm -rf {{.PENV}}
+
+      - echo 'Cleaning shims...'
+      - task: shims:clean
+
+  dependencies-update:
+    desc: Update dependencies
+    cmds:
+      - echo 'Updating python dependencies...'
+      - poetry update
+      - poetry show --outdated

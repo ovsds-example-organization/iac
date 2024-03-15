@@ -1,0 +1,72 @@
+name: Check PR
+
+on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+
+jobs:
+  check-pr:
+    runs-on: ubuntu-20.04
+
+    permissions:
+      contents: read
+
+    container:
+      image: ghcr.io/${{ github.repository_owner }}/ubuntu-ci:jammy-0.4.0
+      credentials:
+        username: ${{ secrets.ROBOT_GITHUB_USER }}
+        password: ${{ secrets.ROBOT_GITHUB_READ_PACKAGES_TOKEN }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          task ci-init
+
+      - name: Lint PR
+        run: |
+          task lint
+
+      - name: Init Terraform
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.TFSTATE_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.TFSTATE_SECRET_ACCESS_KEY }}
+        run: |
+          task terragrunt-all-init
+
+      - name: Lint Terraform
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.TFSTATE_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.TFSTATE_SECRET_ACCESS_KEY }}
+        run: |
+          task tflint-all
+          task tflint-all-modules
+
+      - name: Validate Terraform
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.TFSTATE_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.TFSTATE_SECRET_ACCESS_KEY }}
+        run: |
+          task terragrunt-all-validate
+
+      - name: Login to Yandex Cloud
+        id: get-yc-iam-token
+        uses: yc-actions/yc-iam-token@v1.1.0
+        with:
+          yc-key-id: ${{ secrets.YC_KEY_ID }}
+          yc-service-account-id: ${{ secrets.YC_SERVICE_ACCOUNT_ID }}
+          yc-private-key: ${{ secrets.YC_PRIVATE_KEY }}
+
+      - name: Plan Terraform
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.TFSTATE_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.TFSTATE_SECRET_ACCESS_KEY }}
+          YC_TOKEN: ${{ steps.get-yc-iam-token.outputs.token }}
+          TF_VAR_yc_iam_token: ${{ steps.get-yc-iam-token.outputs.token }}
+        run: |
+          task terragrunt-all-plan

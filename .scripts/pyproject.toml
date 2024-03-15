@@ -1,0 +1,17 @@
+[build-system]
+build-backend = "poetry.core.masonry.api"
+requires = ["poetry-core>=1.0.0"]
+
+[tool.poetry]
+authors = ["ovsds <ovsds@yandex-team.ru>"]
+description = "Scripts"
+name = "scripts"
+version = "0.1.0"
+
+[tool.poetry.dependencies]
+python = "~3.12"
+secret-transfer = "^0.4.0"
+
+[[tool.poetry.source]]
+name = "PyPI"
+priority = "primary"

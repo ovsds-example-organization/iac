@@ -1,0 +1,52 @@
+version: 3
+
+silent: true
+
+vars:
+  TERRAGRUNT_BINARY_FOLDER: "{{.TASKFILE_DIR}}/bin"
+  TERRAGRUNT_BINARY_PATH: "{{.TASKFILE_DIR}}/bin/terragrunt"
+  TERRAGRUNT_RC_FILE_PATH: "{{.TASKFILE_DIR}}/terragrunt.hcl"
+
+  TERRAGRUNT_BASE_DOWNLOAD_URL: https://github.com/gruntwork-io/terragrunt/releases/download
+  TERRAGRUNT_VERSION: 0.55.14
+  TERRAGRUNT_ARCH:
+    sh: uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/' # x86_64 -> amd64, aarch64 -> arm64
+  TERRAGRUNT_PLATFORM:
+    sh: tr '[:upper:]' '[:lower:]' <<< "$(uname)" # Linux -> linux, Darwin -> darwin
+
+  TERRAGRUNT_PLUGIN_CACHE: ~/.terragrunt.d/plugin-cache
+
+tasks:
+  run:
+    desc: Run terragrunt command
+    cmds:
+      - task: init
+      - "{{.TERRAGRUNT_BINARY_PATH}}
+        --terragrunt-config {{.CONFIG}}
+        {{.COMMAND}} {{.CLI_ARGS}}"
+    vars:
+      CONFIG: "{{.CONFIG | default .TERRAGRUNT_RC_FILE_PATH}}"
+
+  init:
+    desc: Initialize environment
+    cmds:
+      - task: clean
+      - echo "Downloading terragrunt binary version({{.TERRAGRUNT_VERSION}}) arch({{.TERRAGRUNT_ARCH}}) platform({{.TERRAGRUNT_PLATFORM}})..."
+      - mkdir -p {{.TERRAGRUNT_BINARY_FOLDER}}
+      - mkdir -p {{.TERRAGRUNT_PLUGIN_CACHE}}
+      - curl --location --output {{.TERRAGRUNT_BINARY_PATH}} "{{.BINARY_URL}}"
+      - chmod +x {{.TERRAGRUNT_BINARY_PATH}}
+    vars:
+      BINARY_URL: "{{.TERRAGRUNT_BASE_DOWNLOAD_URL}}/v{{.TERRAGRUNT_VERSION}}/terragrunt_{{.TERRAGRUNT_PLATFORM}}_{{.TERRAGRUNT_ARCH}}"
+    status:
+      - ! test {{.TERRAGRUNT_BINARY_PATH}}
+      - "[ $({{.TERRAGRUNT_BINARY_PATH}} --version | grep -o 'v[0-9]\\+\\.[0-9]\\+\\.[0-9]\\+') == 'v{{.TERRAGRUNT_VERSION}}' ]"
+
+  clean:
+    desc: Clean environment
+    cmds:
+      - echo "Cleaning terragrunt binary..."
+      - rm -rf {{.TERRAGRUNT_BINARY_FOLDER}}
+
+      - echo "Cleaning terragrunt plugin cache..."
+      - rm -rf {{.TERRAGRUNT_PLUGIN_CACHE}}

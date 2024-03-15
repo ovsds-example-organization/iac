@@ -1,0 +1,237 @@
+version: 3
+
+silent: true
+
+includes:
+  scripts:
+    taskfile: ./.scripts
+    dir: ./.scripts
+
+  terraform:
+    taskfile: ./.scripts/shims/terraform
+    internal: true
+
+  tflint:
+    taskfile: ./.scripts/shims/tflint
+    internal: true
+
+  terragrunt:
+    taskfile: ./.scripts/shims/terragrunt
+    internal: true
+
+vars:
+  IMAGE_REGISTRY: "cr.yandex/crp0gerlvm29cl3507qk"
+  NENV: "node_modules"
+
+tasks:
+  _prettier:
+    internal: true
+    cmds:
+      - "{{.NENV}}/.bin/prettier {{.COMMAND}}"
+
+  _with_nvm:
+    internal: true
+    cmds:
+      - "source ${HOME}/.nvm/nvm.sh && nvm use && {{.COMMAND}}"
+
+  init:
+    desc: Initialize project environment
+    cmds:
+      - echo 'Installing node version...'
+      - task: _with_nvm
+        vars: { COMMAND: "nvm install" }
+
+      - echo 'Installing node dependencies...'
+      - task: _with_nvm
+        vars: { COMMAND: "npm clean-install" }
+
+      - echo 'Installing husky pre-commit...'
+      - task: _with_nvm
+        vars: { COMMAND: "npm run prepare-husky" }
+
+      - echo 'Installing poetry version...'
+      - poetry self update {{.POETRY_TARGET_VERSION}}
+
+      - echo 'Installing .scripts dependencies...'
+      - task: scripts:init
+    vars:
+      POETRY_TARGET_VERSION:
+        sh: cat .poetry-version
+
+  lint:
+    desc: Lint project
+    cmds:
+      - echo 'Running prettier checks...'
+      - task: _prettier
+        vars: { COMMAND: "--check ." }
+
+      - echo 'Linting .scripts'
+      - task: scripts:lint
+
+      - echo 'Running terraform fmt checks...'
+      - task: terraform
+        vars: { COMMAND: "fmt -recursive -check" }
+
+  lint-fix:
+    desc: Lint fix project
+    cmds:
+      - echo 'Running prettier fixes...'
+      - task: _prettier
+        vars: { COMMAND: "--write ." }
+
+      - echo 'Fixing .scripts'
+      - task: scripts:lint-fix
+
+      - echo 'Running terraform fmt autofixes...'
+      - task: terraform
+        vars: { COMMAND: "fmt -recursive -diff" }
+
+  clean:
+    desc: Clean project environment
+    cmds:
+      - echo 'Cleaning node dependencies...'
+      - rm -rf {{.NENV}}
+
+      - echo 'Cleaning local terraform directories'
+      - for: { var: terraform_dirs, as: terraform_dir }
+        cmd: rm -rf {{.terraform_dir}}
+
+      - echo 'Cleaning .scripts dependencies...'
+      - task: scripts:clean
+    vars:
+      terraform_dirs:
+        sh: find src/*/*/*/.terraform -type d -maxdepth 0 || echo ""
+
+  dependencies-update:
+    desc: Update dependencies
+    cmds:
+      - echo 'Updating node dependencies...'
+      - task: _with_nvm
+        vars: { COMMAND: "npm update" }
+      - task: _with_nvm
+        vars: { COMMAND: "npm outdated" }
+      - task: _with_nvm
+        vars: { COMMAND: "npm audit" }
+
+      - echo 'Updating .scripts dependencies...'
+      - task: scripts:dependencies-update
+
+  terraform:
+    desc: terraform shim
+    cmds:
+      - echo 'Running terraform for {{.DIR}} with {{.COMMAND}}{{.CLI_ARGS}}...'
+      - task: terraform:run
+        vars: { COMMAND: "-chdir={{.DIR}} {{.COMMAND}}", CLI_ARGS: "{{.CLI_ARGS}}" }
+    vars:
+      DIR: '{{.DIR | default "."}}'
+
+  tflint:
+    desc: tflint shim
+    cmds:
+      - echo 'Running tflint for {{.DIR}} with {{.COMMAND}}{{.CLI_ARGS}}...'
+      - task: tflint:run
+        vars: { COMMAND: "--chdir={{.DIR}} {{.COMMAND}}", CLI_ARGS: "{{.CLI_ARGS}}" }
+    vars:
+      DIR: '{{.DIR | default "."}}'
+
+  tflint-all:
+    desc: Run tflint for all or specific environment/layer
+    cmds:
+      - for: { var: DIRS, as: DIR }
+        task: tflint
+        vars: { DIR: "{{.DIR}}", COMMAND: "{{.COMMAND}}", CLI_ARGS: "{{.CLI_ARGS}}" }
+    vars:
+      ENV: '{{.ENV | default "*"}}'
+      LAYER: '{{.LAYER | default "*"}}'
+      DIRS:
+        sh: find src/environments/{{.ENV}}/{{.LAYER}} -type d -maxdepth 0
+
+  tflint-all-modules:
+    desc: Run tflint for all modules
+    cmds:
+      - for: { var: DIRS, as: DIR }
+        task: tflint
+        vars: { DIR: "{{.DIR}}", COMMAND: "{{.COMMAND}}", CLI_ARGS: "{{.CLI_ARGS}}" }
+    vars:
+      DIRS:
+        sh: find src/modules/*/* -type d -maxdepth 0
+
+  terragrunt:
+    desc: terragrunt shim
+    cmds:
+      - echo 'Running terragrunt for {{.DIR}} with {{.COMMAND}}{{.CLI_ARGS}}...'
+      - task: terragrunt:run
+        vars:
+          COMMAND: "--terragrunt-working-dir {{.DIR}} {{.COMMAND}}"
+          CLI_ARGS: "{{.CLI_ARGS}}"
+          CONFIG: "{{.CONFIG}}"
+    vars:
+      DIR: '{{.DIR | default "."}}'
+      CONFIG: '{{.CONFIG | default "terragrunt.hcl"}}'
+
+  terragrunt-all:
+    desc: Run terragrunt for all or specific environment/layer
+    cmds:
+      - task: terragrunt
+        vars: { DIR: "{{.DIR}}", COMMAND: "run-all {{.COMMAND}}", CLI_ARGS: "{{.CLI_ARGS}}" }
+    vars:
+      ENV: "{{.ENV}}"
+      LAYER: "{{.LAYER}}"
+      DIR: 'src/environments{{ if eq .ENV "" }}{{ else }}/{{.ENV}}{{ if eq .LAYER "" }}{{ else }}/{{.LAYER}}{{ end }}{{ end }}'
+
+  terragrunt-all-init:
+    desc: Initialize terraform
+    cmds:
+      - echo 'Initializing terraform...'
+      - task: terragrunt-all
+        vars: { COMMAND: "init" }
+
+  terragrunt-all-providers-lock:
+    desc: Lock terraform providers
+    cmds:
+      - echo 'Locking terraform providers...'
+      - task: terragrunt-all
+        vars:
+          COMMAND: "providers lock
+            -net-mirror=https://terraform-mirror.yandexcloud.net
+            -platform=linux_amd64
+            -platform=darwin_arm64"
+
+  terragrunt-all-validate:
+    desc: Validate terraform
+    cmds:
+      - echo 'Validating terraform...'
+      - task: terragrunt-all
+        vars: { COMMAND: "validate" }
+
+  terragrunt-all-plan:
+    desc: Plan terraform
+    cmds:
+      - echo 'Planning terraform...'
+      - task: terragrunt-all
+        vars: { COMMAND: "plan" }
+
+  terragrunt-all-apply:
+    desc: Apply terraform
+    cmds:
+      - echo 'Applying terraform...'
+      - task: terragrunt-all
+        vars: { COMMAND: "apply" }
+
+  # CI-specific
+
+  ci-init:
+    desc: Initialize project environment in CI
+    cmds:
+      - echo 'Installing node dependencies...'
+      - npm clean-install
+
+      - echo 'Installing .scripts dependencies...'
+      - task: scripts:init
+
+  ci-terragrunt-all-apply:
+    desc: Apply terraform in CI with auto-approve
+    cmds:
+      - echo 'Applying terraform...'
+      - task: terragrunt-all
+        vars: { COMMAND: "apply -auto-approve" }

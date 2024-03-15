@@ -1,0 +1,55 @@
+version: 3
+
+silent: true
+
+vars:
+  TFLINT_BINARY_FOLDER: "{{.TASKFILE_DIR}}/bin"
+  TFLINT_BINARY_PATH: "{{.TASKFILE_DIR}}/bin/tflint"
+  TFLINT_CONFIG_FILE_PATH: "{{.TASKFILE_DIR}}/tflint.hcl"
+
+  TFLINT_ARCHIVE_PATH: "{{.TASKFILE_DIR}}/bin/tflint.zip"
+  TFLINT_BASE_DOWNLOAD_URL: https://github.com/terraform-linters/tflint/releases/download
+  TFLINT_VERSION: 0.50.3
+  TFLINT_ARCH:
+    sh: uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/' # x86_64 -> amd64, aarch64 -> arm64
+  TFLINT_PLATFORM:
+    sh: tr '[:upper:]' '[:lower:]' <<< "$(uname)" # Linux -> linux, Darwin -> darwin
+
+  TFLINT_PLUGIN_CACHE: ~/.tflint.d/plugin-cache
+
+tasks:
+  run:
+    desc: Run tflint command
+    cmds:
+      - task: init
+      - "{{.TFLINT_BINARY_PATH}} --config={{.TFLINT_CONFIG_FILE_PATH}} {{.COMMAND}} {{.CLI_ARGS}} "
+
+  init:
+    desc: Initialize environment
+    cmds:
+      - task: clean
+      - echo "Downloading tflint binary version({{.TFLINT_VERSION}}) arch({{.TFLINT_ARCH}}) platform({{.TFLINT_PLATFORM}})..."
+      - mkdir -p {{.TFLINT_BINARY_FOLDER}}
+      - mkdir -p {{.TFLINT_PLUGIN_CACHE}}
+      - curl --location --output {{.TFLINT_ARCHIVE_PATH}} "{{.ARCHIVE_URL}}"
+      - defer: rm {{.TFLINT_ARCHIVE_PATH}}
+      - unzip {{.TFLINT_ARCHIVE_PATH}} -d {{.TFLINT_BINARY_FOLDER}}
+      - chmod +x {{.TFLINT_BINARY_PATH}}
+      - echo "Initializing tflint..."
+      - task: run
+        vars:
+          COMMAND: --init
+    vars:
+      ARCHIVE_URL: "{{.TFLINT_BASE_DOWNLOAD_URL}}/v{{.TFLINT_VERSION}}/tflint_{{.TFLINT_PLATFORM}}_{{.TFLINT_ARCH}}.zip"
+    status:
+      - ! test {{.TFLINT_BINARY_PATH}}
+      - "[ $({{.TFLINT_BINARY_PATH}} --version | grep -o '[0-9]\\+\\.[0-9]\\+\\.[0-9]\\+'| head -n1) == '{{.TFLINT_VERSION}}' ]"
+
+  clean:
+    desc: Clean environment
+    cmds:
+      - echo "Cleaning tflint binary..."
+      - rm -rf {{.TFLINT_BINARY_FOLDER}}
+
+      - echo "Cleaning tflint plugin cache..."
+      - rm -rf {{.TFLINT_PLUGIN_CACHE}}

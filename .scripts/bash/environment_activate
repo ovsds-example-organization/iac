@@ -1,0 +1,138 @@
+#!/usr/bin/env bash
+
+_EA_ENVIRONMENT_NAME=iac
+
+case $(basename "$SHELL") in
+  "zsh")
+    _EA_SCRIPTS_FOLDER="${0:A:h}/.."
+    # shellcheck disable=SC2154,SC1087
+    _EA_COLOR_GREEN="%{$fg[green]%}"
+    # shellcheck disable=SC2154
+    _EA_COLOR_NC="%{$reset_color%}"
+  ;;
+  *)
+    _EA_SCRIPTS_FOLDER="$(dirname "${BASH_SOURCE[0]}")/.."
+    _EA_COLOR_GREEN="\[\e[32m\]"
+    _EA_COLOR_NC="\[\e[0m\]"
+  ;;
+esac
+
+_EA_SECRETS_TRANSFER="$_EA_SCRIPTS_FOLDER/.venv/bin/secret-transfer"
+_EA_SECRETS_SETTINGS="$_EA_SCRIPTS_FOLDER/secrets/local.yaml"
+
+_EA_YC_PROFILE=$(grep YC_PROFILE= "$_EA_SCRIPTS_FOLDER/secrets/.env" | sed 's/.*=//')
+
+_ea_unset_script_variables() {
+  unset _EA_ENVIRONMENT_NAME
+  unset _EA_SCRIPTS_FOLDER
+  unset _EA_COLOR_GREEN
+  unset _EA_COLOR_NC
+  unset _EA_SECRETS_TRANSFER
+  unset _EA_SECRETS_SETTINGS
+  unset _EA_YC_PROFILE
+}
+
+_ea_export_local_variables() {
+  echo "Setting up local env variables..."
+  # shellcheck disable=SC2091
+  $($_EA_SECRETS_TRANSFER run -f "$_EA_SECRETS_SETTINGS")
+}
+
+_ea_unset_set_local_variables() {
+  echo "Cleaning up local envs..."
+  # shellcheck disable=SC2091
+  $($_EA_SECRETS_TRANSFER clean -f "$_EA_SECRETS_SETTINGS")
+}
+
+_ea_set_tokens() {
+  echo "Creating iam token..."
+  YC_TOKEN=$(
+    yc iam create-token \
+    --profile ${_EA_YC_PROFILE}
+  )
+  TF_VAR_yc_iam_token=$YC_TOKEN
+  export YC_TOKEN
+  export TF_VAR_yc_iam_token
+}
+
+_ea_unset_tokens() {
+  echo "Cleaning iam token..."
+  unset YC_TOKEN
+  unset TF_VAR_yc_iam_token
+}
+
+_ea_set_console_prefix() {
+  echo "Setting up console color and prefix..."
+  _EA_PREVIOUS_PS1="${PS1}"
+  PS1="${_EA_COLOR_GREEN}(${_EA_ENVIRONMENT_NAME})${_EA_COLOR_NC}${PS1}"
+}
+
+_ea_unset_console_prefix() {
+  echo "Cleaning up console color and prefix..."
+  PS1="${_EA_PREVIOUS_PS1}"
+  unset _EA_PREVIOUS_PS1
+}
+
+_ea_set_active_environment() {
+  export _EA_ACTIVE_ENVIRONMENT=$_EA_ENVIRONMENT_NAME
+  echo ""
+  echo "Environment $_EA_ENVIRONMENT_NAME is activated."
+  echo "To deactivate: run 'environment_deactivate'."
+  echo "To renew tokens, run 'environment_renew'"
+}
+
+_ea_unset_active_environment() {
+  echo ""
+  echo "Environment $_EA_ENVIRONMENT_NAME is deactivated."
+  unset _EA_ACTIVE_ENVIRONMENT
+}
+
+_environment_activate() {
+  if [ -n "$_EA_ACTIVE_ENVIRONMENT" ]; then
+      echo "Active env is already set to $_EA_ACTIVE_ENVIRONMENT"
+      echo "To deactivate, run 'environment_deactivate'"
+      return
+  fi
+
+  _ea_export_local_variables
+  _ea_set_tokens
+  _ea_set_console_prefix
+
+  _ea_set_active_environment
+
+  unset -f _ea_export_local_variables
+  unset -f _ea_set_console_prefix
+  unset -f _ea_set_active_environment
+  unset -f _environment_activate
+}
+
+environment_renew() {
+  _ea_set_tokens
+}
+
+environment_deactivate() {
+  if [ -z "$_EA_ACTIVE_ENVIRONMENT" ]; then
+      echo "No active environment to deactivate."
+      return
+  fi
+
+  _ea_unset_console_prefix
+  _ea_unset_set_local_variables
+  _ea_unset_tokens
+  _ea_unset_script_variables
+
+  _ea_unset_active_environment
+
+
+  unset -f _ea_set_tokens
+  unset -f environment_renew
+
+  unset -f _ea_unset_console_prefix
+  unset -f _ea_unset_set_local_variables
+  unset -f _ea_unset_tokens
+  unset -f _ea_unset_script_variables
+  unset -f _ea_unset_active_environment
+  unset -f environment_deactivate
+}
+
+_environment_activate
