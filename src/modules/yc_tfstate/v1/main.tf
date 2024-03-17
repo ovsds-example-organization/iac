@@ -34,6 +34,10 @@ resource "yandex_iam_service_account_static_access_key" "tfstate" {
   service_account_id = yandex_iam_service_account.tfstate.id
 
   description = "Static access key for object storage"
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 resource "yandex_storage_bucket" "tfstate" {
@@ -45,6 +49,10 @@ resource "yandex_storage_bucket" "tfstate" {
 
   versioning {
     enabled = true
+  }
+
+  lifecycle {
+    prevent_destroy = true
   }
 }
 
