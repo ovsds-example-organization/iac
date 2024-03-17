@@ -46,18 +46,15 @@ _ea_unset_set_local_variables() {
 
 _ea_set_tokens() {
   echo "Creating iam token..."
-  YC_TOKEN=$(
+  TF_VAR_yc_iam_token=$(
     yc iam create-token \
     --profile ${_EA_YC_PROFILE}
   )
-  TF_VAR_yc_iam_token=$YC_TOKEN
-  export YC_TOKEN
   export TF_VAR_yc_iam_token
 }
 
 _ea_unset_tokens() {
   echo "Cleaning iam token..."
-  unset YC_TOKEN
   unset TF_VAR_yc_iam_token
 }
 
