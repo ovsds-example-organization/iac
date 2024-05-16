@@ -13,9 +13,19 @@ variable "github_robot_secrets" {
   description = "GitHub robot secrets"
 }
 
-variable "tfstate_secrets" {
-  type        = map(string)
-  description = "Secrets to tfstate bucket"
+variable "tfstate_yc_folder_id" {
+  type        = string
+  description = "tfstate Yandex Cloud folder ID"
+}
+
+variable "tfstate_access_key_id" {
+  type        = string
+  description = "tfstate Access key ID"
+}
+
+variable "tfstate_secret_access_key" {
+  type        = string
+  description = "tfstate Secret access key"
 }
 
 variable "yc_iam_token" {

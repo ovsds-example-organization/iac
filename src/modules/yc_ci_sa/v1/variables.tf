@@ -23,3 +23,9 @@ variable "cloud_iam_members" {
   description = "IAM bindings map to apply to the service account, format: {cloud_id = role}"
   default     = {}
 }
+
+variable "folder_iam_members" {
+  type        = map(string)
+  description = "IAM bindings map to apply to the service account, format: {folder_id = role}"
+  default     = {}
+}

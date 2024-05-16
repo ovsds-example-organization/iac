@@ -7,13 +7,13 @@ includes:
     internal: true
     taskfile: ./terraform
 
-  tflint:
-    internal: true
-    taskfile: ./tflint
-
   terragrunt:
     internal: true
     taskfile: ./terragrunt
+
+  tflint:
+    internal: true
+    taskfile: ./tflint
 
 tasks:
   init:
@@ -22,11 +22,11 @@ tasks:
       - echo 'Initializing terraform...'
       - task: terraform:init
 
-      - echo 'Initializing tflint...'
-      - task: tflint:init
-
       - echo 'Initializing terragrunt...'
       - task: terragrunt:init
+
+      - echo 'Initializing tflint...'
+      - task: tflint:init
 
   clean:
     desc: Clean shims
@@ -34,8 +34,8 @@ tasks:
       - echo 'Cleaning terraform...'
       - task: terraform:clean
 
-      - echo 'Cleaning tflint...'
-      - task: tflint:clean
-
       - echo 'Cleaning terragrunt...'
       - task: terragrunt:clean
+
+      - echo 'Cleaning tflint...'
+      - task: tflint:clean
