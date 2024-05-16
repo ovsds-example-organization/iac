@@ -10,6 +10,6 @@ terraform {
 }
 
 provider "yandex" {
-  cloud_id = var.cloud_id
-  token    = var.iam_token
+  cloud_id = var.yc_cloud_id
+  token    = var.yc_iam_token
 }

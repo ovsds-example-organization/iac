@@ -11,12 +11,12 @@ includes:
     taskfile: ./.scripts/shims/terraform
     internal: true
 
-  tflint:
-    taskfile: ./.scripts/shims/tflint
-    internal: true
-
   terragrunt:
     taskfile: ./.scripts/shims/terragrunt
+    internal: true
+
+  tflint:
+    taskfile: ./.scripts/shims/tflint
     internal: true
 
 vars:
@@ -173,18 +173,32 @@ tasks:
     desc: Run terragrunt for all or specific environment/layer
     cmds:
       - task: terragrunt
-        vars: { DIR: "{{.DIR}}", COMMAND: "run-all {{.COMMAND}}", CLI_ARGS: "{{.CLI_ARGS}}" }
+        vars:
+          DIR: "{{.DIR}}"
+          COMMAND: 'run-all
+            --terragrunt-parallelism {{.PARALLELISM}}
+            {{ if eq .IGNORE_DEPS "true" }}--terragrunt-ignore-external-dependencies{{ end }}
+            {{.COMMAND}}'
+          CLI_ARGS: "{{.CLI_ARGS}}"
     vars:
+      PARALLELISM: "{{.PARALLELISM | default 10}}"
       ENV: "{{.ENV}}"
       LAYER: "{{.LAYER}}"
       DIR: 'src/environments{{ if eq .ENV "" }}{{ else }}/{{.ENV}}{{ if eq .LAYER "" }}{{ else }}/{{.LAYER}}{{ end }}{{ end }}'
+      IGNORE_DEPS: '{{.IGNORE_DEPS | default "true"}}'
+    env:
+      # https://terragrunt.gruntwork.io/docs/features/provider-cache/ drop when not experimental
+      TERRAGRUNT_PROVIDER_CACHE: 1
+      TERRAGRUNT_PROVIDER_CACHE_DIR: "$HOME/.terraform.d/plugin-cache"
+      TERRAGRUNT_PROVIDER_CACHE_REGISTRY_NAMES: "terraform-mirror.yandexcloud.net"
 
   terragrunt-all-init:
     desc: Initialize terraform
     cmds:
       - echo 'Initializing terraform...'
       - task: terragrunt-all
-        vars: { COMMAND: "init" }
+        vars:
+          COMMAND: "init"
 
   terragrunt-all-providers-lock:
     desc: Lock terraform providers
@@ -195,7 +209,8 @@ tasks:
           COMMAND: "providers lock
             -net-mirror=https://terraform-mirror.yandexcloud.net
             -platform=linux_amd64
-            -platform=darwin_arm64"
+            -platform=darwin_arm64
+            --terragrunt-ignore-dependency-order"
 
   terragrunt-all-validate:
     desc: Validate terraform
@@ -234,4 +249,4 @@ tasks:
     cmds:
       - echo 'Applying terraform...'
       - task: terragrunt-all
-        vars: { COMMAND: "apply -auto-approve" }
+        vars: { COMMAND: "apply --terragrunt-non-interactive" }
