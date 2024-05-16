@@ -18,7 +18,10 @@ module "robot" {
   folder_id       = var.yc_folder_id
   repository_name = local.repository_name
 
-  cloud_iam_members = { (var.yc_cloud_id) = "admin" }
+  folder_iam_members = {
+    (var.yc_folder_id)         = "admin",
+    (var.tfstate_yc_folder_id) = "admin",
+  }
 }
 
 module "secrets" {
@@ -33,8 +36,8 @@ module "secrets" {
     ROBOT_GITHUB_READ_PACKAGES_TOKEN : var.github_robot_secrets["READ_PACKAGES_TOKEN"]
     ROBOT_GITHUB_WRITE_PACKAGES_TOKEN : var.github_robot_secrets["ADMIN_TOKEN"]
 
-    TFSTATE_ACCESS_KEY_ID : var.tfstate_secrets["ACCESS_KEY_ID"]
-    TFSTATE_SECRET_ACCESS_KEY : var.tfstate_secrets["SECRET_ACCESS_KEY"]
+    TFSTATE_ACCESS_KEY_ID : var.tfstate_access_key_id
+    TFSTATE_SECRET_ACCESS_KEY : var.tfstate_secret_access_key
 
     YC_KEY_ID : module.robot.key_id
     YC_SERVICE_ACCOUNT_ID : module.robot.service_account.id
